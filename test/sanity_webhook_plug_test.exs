@@ -22,7 +22,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
     assert conn.private.sanity_webhook_error == false
@@ -33,7 +33,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     refute conn.halted
     assert conn.private.sanity_webhook_error == false
@@ -43,10 +43,9 @@ defmodule SanityWebhookPlugTest do
     assert capture_log(fn ->
              opts = Keyword.delete(@opts, :path)
 
-             conn =
-               @good_payload
-               |> setup_conn(@good_signature)
-               |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+             @good_payload
+             |> setup_conn(@good_signature)
+             |> call(opts)
            end) =~ ":path is not set for SanityWebhookPlug; skipping plug"
   end
 
@@ -56,7 +55,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
     refute :sanity_webhook_error in Map.keys(conn.private)
@@ -66,7 +65,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
     refute :sanity_webhook_error in Map.keys(conn.private)
@@ -81,7 +80,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     refute conn.halted
     assert conn.private.sanity_webhook_error == false
@@ -93,7 +92,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     assert conn.halted
     assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
@@ -103,7 +102,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
     assert conn.private.sanity_webhook_error == false
@@ -116,7 +115,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(bad_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     assert conn.halted
     assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
@@ -129,7 +128,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(bad_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     assert conn.halted
 
@@ -143,7 +142,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(bad_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     assert conn.halted
     assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
@@ -155,7 +154,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       bad_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     assert conn.halted
     assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
@@ -167,7 +166,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       @good_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
   end
@@ -179,7 +178,7 @@ defmodule SanityWebhookPlugTest do
     conn =
       bad_payload
       |> setup_conn(@good_signature)
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+      |> call(opts)
 
     refute conn.halted
     assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
@@ -193,7 +192,7 @@ defmodule SanityWebhookPlugTest do
       |> put_req_header("content-type", "application/json")
       |> put_req_header("user-agent", "Sanity.io webhook delivery")
       |> put_req_header("accept-encoding", "gzip")
-      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+      |> call(@opts)
 
     assert conn.halted
 
@@ -208,5 +207,9 @@ defmodule SanityWebhookPlugTest do
     |> put_req_header("content-type", "application/json")
     |> put_req_header("user-agent", "Sanity.io webhook delivery")
     |> put_req_header("accept-encoding", "gzip")
+  end
+
+  defp call(conn, opts) do
+    SanityWebhookPlug.call(conn, SanityWebhookPlug.init(opts))
   end
 end
