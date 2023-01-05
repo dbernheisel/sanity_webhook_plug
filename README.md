@@ -11,7 +11,8 @@ You're reading the main branch's readme. Please visit
 <!-- MDOC !-->
 
 SanityWebhookPlug is a Plug that verifies Sanity webhooks for your Elixir Plug
-application.
+application. Designed to work with [Sanity GROQ-powered
+webhooks](https://www.sanity.io/docs/webhooks)
 
 ## Installation
 

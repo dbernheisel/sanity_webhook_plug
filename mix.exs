@@ -1,15 +1,18 @@
 defmodule SanityWebhookPlug.MixProject do
   use Mix.Project
+  @version "0.1.0"
 
   def project do
     [
       app: :sanity_webhook_plug,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.14",
       preferred_cli_env: [dialyzer: :test, credo: :test, tests: :test],
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
-      deps: deps()
+      package: package(),
+      deps: deps(),
+      docs: docs()
     ]
   end
 
@@ -20,7 +23,32 @@ defmodule SanityWebhookPlug.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
+  defp docs do
+    [
+      source_ref: @version,
+      extras: ["CHANGELOG.md", "LICENSE"]
+    ]
+  end
+
+  defp package do
+    %{
+      maintainers: ["David Bernheisel"],
+      licenses: ["Apache 2.0"],
+      files: [
+        "lib",
+        "mix.exs",
+        "CHANGELOG*",
+        "README*",
+        "LICENSE*"
+      ],
+      links: %{
+        "GitHub" => "https://github.com/bitfo/sanity_webhook_plug",
+        "Readme" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/README.md",
+        "Changelog" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md"
+      }
+    }
+  end
+
   defp deps do
     [
       {:plug, "~> 1.0"},
