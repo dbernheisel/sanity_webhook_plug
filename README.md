@@ -52,7 +52,7 @@ protect your system by limiting how much of body to read to prevent exhaustion.
 Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
 should also have here for SanityWebhookPlug.
 
-By default, errors will be handled by the plug by responding with a 500 error
+By default, errors will be handled by the plug by responding with a 400 error
 and a error message.
 
 **Handle Errors Yourself**
