@@ -1,6 +1,7 @@
 defmodule SanityWebhookPlugTest do
   use ExUnit.Case
   use Plug.Test
+  import ExUnit.CaptureLog
 
   def secret, do: "test"
   def bad_secret, do: "test2"
@@ -10,10 +11,66 @@ defmodule SanityWebhookPlugTest do
   @good_hash "tLa470fx7qkLLEcMOcEUFuBbRSkGujyskxrNXcoh0N0"
   @good_signature "t=#{@good_ts},v1=#{@good_hash}"
   @opts [
-    paths: ["/sanity"],
+    path: ["/sanity", "/webhook"],
     halt_on_error: true,
     secret: "test"
   ]
+
+  test "works with single path" do
+    opts = Keyword.put(@opts, :path, "/sanity")
+
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+
+    refute conn.halted
+    assert conn.private.sanity_webhook_error == false
+  end
+
+  test "works with multiple paths" do
+    # @opts contains multiple paths
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> SanityWebhookPlug.call(SanityWebhookPlug.init(@opts))
+
+    refute conn.halted
+    assert conn.private.sanity_webhook_error == false
+  end
+
+  test "logs warning with no path set" do
+    assert capture_log(fn ->
+             opts = Keyword.delete(@opts, :path)
+
+             conn =
+               @good_payload
+               |> setup_conn(@good_signature)
+               |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+           end) =~ ":path is not set for SanityWebhookPlug; skipping plug"
+  end
+
+  test "skips without path match" do
+    opts = Keyword.put(@opts, :path, "/no-matchy")
+
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+
+    refute conn.halted
+    refute :sanity_webhook_error in Map.keys(conn.private)
+
+    opts = Keyword.put(@opts, :path, ["/no-matchy", "/no-matchy-2"])
+
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> SanityWebhookPlug.call(SanityWebhookPlug.init(opts))
+
+    refute conn.halted
+    refute :sanity_webhook_error in Map.keys(conn.private)
+  end
 
   test "computes signature" do
     assert {:ok, computed} =

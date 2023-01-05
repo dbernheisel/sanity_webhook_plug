@@ -32,9 +32,7 @@ Use this plug in your endpoint:
 # If using Plug or Phoenix, place before `plug Plug.Parsers`
 # For Phoenix apps, in lib/my_app_web/endpoint.ex:
 plug SanityWebhookPlug,
-  paths: ["/webhooks/sanity/bust_cache"],
-  halt_on_error: true,
-  secret: {MyApp.Config, :get, [:sanity_webhook_secret]}
+  path: ["/webhooks/sanity/bust_cache"]
 ```
 
 You may alternatively configure the secret in config, which will be read during
@@ -55,7 +53,24 @@ should also have here for SanityWebhookPlug.
 By default, errors will be handled by the plug by responding with a 400 error
 and a error message.
 
-**Handle Errors Yourself**
+### Options:
+
+- `:path` (required): The request paths to match against. Can either be a single
+    route or a list of routes. eg: `["/webhooks/sanity/bust_cache"]` or `"/sanity"`
+- `:halt_on_error` (default: `true`): Halt on error. If you want to handle errors
+    yourself, provide `false` and handle the error in your controller action.
+- `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will
+    be called at runtime, otherwise it will be compiled. If not set, it will
+    obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
+
+Options forwarded to `Plug.Conn.read_body/2`:
+
+- `:length` - sets the number of bytes to read from the request at a time.
+- `:read_length` - sets the amount of bytes to read at one time from the
+    underlying socket to fill the chunk.
+- `:read_timeout` - sets the timeout for each socket read.
+
+### Handle Errors Yourself
 
 If you want to handle errors yourself, you may configure the plug to
 `halt_on_error: false` and handle the error yourself. If an error occurs, you

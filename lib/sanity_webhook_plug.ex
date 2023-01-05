@@ -14,29 +14,14 @@ defmodule SanityWebhookPlug do
 
   @doc """
   Initialize SanityWebhookPlug options.
-
-  Options:
-
-  - `:paths` (req): The request paths to match against. eg: `["/webhooks/sanity/bust_cache"]`
-  - `:halt_on_error` (default: true): Halt on error. If you want to handle errors yourself, make this `false` and handle
-      in your controller action.
-  - `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will be called at runtime, otherwise it
-      will be compiled. If not set, it will obtain via config
-      `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
-
-  Options forwarded to `Plug.Conn.read_body/2`:
-
-  - `:length` - sets the number of bytes to read from the request at a time.
-  - `:read_length` - sets the amount of bytes to read at one time from the underlying socket to fill the chunk.
-  - `:read_timeout` - sets the timeout for each socket read.
   """
   def init(opts) do
-    paths = Keyword.get(opts, :paths)
-    paths || Logger.warn(":paths is not set for #{inspect(__MODULE__)}, skipping plug")
+    paths = Keyword.get(opts, :path)
+    paths || Logger.warn(":path is not set for #{inspect(__MODULE__)}; skipping plug")
 
     [
+      paths,
       Keyword.get(opts, :secret),
-      List.wrap(paths),
       Keyword.take(opts, [:length, :read_length, :read_timeout]),
       Keyword.get(opts, :halt_on_error, false)
     ]
@@ -45,17 +30,24 @@ defmodule SanityWebhookPlug do
   @doc """
   Process the conn for a Sanity Webhook and verify its authenticity.
   """
-  def call(%Plug.Conn{request_path: path} = conn, [secret, paths, read_opts, halt_on_error])
-      when paths != [] do
-    with true <- path in paths,
-         {:ok, conn, body} <- read_body(conn, read_opts),
+  def call(%Plug.Conn{request_path: path} = conn, [path | opts]) when is_binary(path) do
+    call(conn, opts)
+  end
+
+  def call(%Plug.Conn{request_path: path} = conn, [paths | opts]) when is_list(paths) and paths != [] do
+    if path in paths do
+      call(conn, opts)
+    else
+      conn
+    end
+  end
+
+  def call(conn, [secret, read_opts, halt_on_error]) do
+    with {:ok, conn, body} <- read_body(conn, read_opts),
          {:ok, conn, {ts, signature}} <- get_signature(conn),
          :ok <- verify(conn, signature, ts, body, secret) do
       Plug.Conn.put_private(conn, @plug_error_key, false)
     else
-      false ->
-        conn
-
       {:error, conn, error} ->
         conn = Plug.Conn.put_private(conn, @plug_error_key, error)
 
