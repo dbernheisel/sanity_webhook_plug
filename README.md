@@ -1,8 +1,7 @@
 <!-- badges -->
-
-[![Hex.pm Version](http://img.shields.io/hexpm/v/sanity_webhook_plug.svg)](https://hex.pm/packages/sanity_webhook_plug)
+[![Hex.pm Version](http://img.shields.io/hexpm/v/sanity_webhook_plug)](https://hex.pm/packages/sanity_webhook_plug)
 [![Hex docs](http://img.shields.io/badge/hex.pm-docs-blue.svg?style=flat)](https://hexdocs.pm/sanity_webhook_plug)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE.md)
+[![License](https://img.shields.io/hexpm/l/sanity_webhook_plug)](./LICENSE)
 
 # Sanity Webhook Plug
 
