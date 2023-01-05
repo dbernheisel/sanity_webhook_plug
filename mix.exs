@@ -33,7 +33,7 @@ defmodule SanityWebhookPlug.MixProject do
   defp package do
     %{
       maintainers: ["David Bernheisel"],
-      licenses: ["Apache 2.0"],
+      licenses: ["Apache-2.0"],
       files: [
         "lib",
         "mix.exs",
