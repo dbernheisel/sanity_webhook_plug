@@ -34,7 +34,8 @@ defmodule SanityWebhookPlug do
     call(conn, opts)
   end
 
-  def call(%Plug.Conn{request_path: path} = conn, [paths | opts]) when is_list(paths) and paths != [] do
+  def call(%Plug.Conn{request_path: path} = conn, [paths | opts])
+      when is_list(paths) and paths != [] do
     if path in paths do
       call(conn, opts)
     else

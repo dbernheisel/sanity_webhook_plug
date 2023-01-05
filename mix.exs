@@ -33,7 +33,7 @@ defmodule SanityWebhookPlug.MixProject do
 
   defp aliases do
     [
-      tests: ["test", "dialyzer", "credo"]
+      tests: ["test", "dialyzer", "credo", "format --check-formatted"]
     ]
   end
 end
