@@ -62,6 +62,9 @@ and a error message.
 - `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will
     be called at runtime, otherwise it will be compiled. If not set, it will
     obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
+- `:json_library`: JSON encoding library. When not supplied, it will use choose
+    Phoenix's configured library, `Jason`, or `Poison`. Sanity requires
+    JSON-encoded responses.
 
 Options forwarded to `Plug.Conn.read_body/2`:
 

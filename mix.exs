@@ -44,7 +44,8 @@ defmodule SanityWebhookPlug.MixProject do
       links: %{
         "GitHub" => "https://github.com/bitfo/sanity_webhook_plug",
         "Readme" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/README.md",
-        "Changelog" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md"
+        "Changelog" =>
+          "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md"
       }
     }
   end

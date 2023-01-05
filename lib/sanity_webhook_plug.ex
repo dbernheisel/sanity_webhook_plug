@@ -19,11 +19,17 @@ defmodule SanityWebhookPlug do
     paths = Keyword.get(opts, :path)
     paths || Logger.warn(":path is not set for #{inspect(__MODULE__)}; skipping plug")
 
+    sanity_json = Keyword.get(opts, :json_library)
+    phoenix_json = Application.get_env(:phoenix, :json_library)
+    jason = if Code.ensure_loaded?(Jason), do: Jason
+    poison = if Code.ensure_loaded?(Poison), do: Poison
+
     [
       paths,
       Keyword.get(opts, :secret),
       Keyword.take(opts, [:length, :read_length, :read_timeout]),
-      Keyword.get(opts, :halt_on_error, false)
+      Keyword.get(opts, :halt_on_error, false),
+      sanity_json || phoenix_json || jason || poison
     ]
   end
 
@@ -43,7 +49,7 @@ defmodule SanityWebhookPlug do
     end
   end
 
-  def call(conn, [secret, read_opts, halt_on_error]) do
+  def call(conn, [secret, read_opts, halt_on_error, json]) do
     with {:ok, conn, body} <- read_body(conn, read_opts),
          {:ok, conn, {ts, signature}} <- get_signature(conn),
          :ok <- verify(conn, signature, ts, body, secret) do
@@ -54,7 +60,8 @@ defmodule SanityWebhookPlug do
 
         if halt_on_error do
           conn
-          |> Plug.Conn.send_resp(:bad_request, error)
+          |> Plug.Conn.put_resp_header("content-type", "application/json")
+          |> Plug.Conn.send_resp(:bad_request, json.encode!(%{error: error}))
           |> Plug.Conn.halt()
         else
           conn
