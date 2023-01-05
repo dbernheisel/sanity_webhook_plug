@@ -29,7 +29,8 @@ defmodule SanityWebhookPlug do
       Keyword.get(opts, :secret),
       Keyword.take(opts, [:length, :read_length, :read_timeout]),
       Keyword.get(opts, :halt_on_error, false),
-      sanity_json || phoenix_json || jason || poison
+      sanity_json || phoenix_json || jason || poison,
+      Keyword.get(opts, :debug, false)
     ]
   end
 
@@ -49,23 +50,19 @@ defmodule SanityWebhookPlug do
     end
   end
 
-  def call(conn, [secret, read_opts, halt_on_error, json]) do
+  def call(conn, [secret, read_opts, halt_on_error, json, debug]) do
     with {:ok, conn, body} <- read_body(conn, read_opts),
          {:ok, conn, {ts, signature}} <- get_signature(conn),
          :ok <- verify(conn, signature, ts, body, secret) do
       Plug.Conn.put_private(conn, @plug_error_key, false)
     else
-      {:error, conn, error} ->
-        conn = Plug.Conn.put_private(conn, @plug_error_key, error)
+      {:error, conn, error, comps} ->
+        conn
+        |> maybe_debug(debug, comps, secret)
+        |> handle_error(halt_on_error, json, error)
 
-        if halt_on_error do
-          conn
-          |> Plug.Conn.put_resp_header("content-type", "application/json")
-          |> Plug.Conn.send_resp(:bad_request, json.encode!(%{error: error}))
-          |> Plug.Conn.halt()
-        else
-          conn
-        end
+      {:error, conn, error} ->
+        handle_error(conn, halt_on_error, json, error)
     end
   end
 
@@ -85,7 +82,7 @@ defmodule SanityWebhookPlug do
 
   defp verify(conn, signature, ts, body, secret) do
     case Signature.verify(signature, ts, body, secret) do
-      {:error, message} -> {:error, conn, message}
+      {:error, message} -> {:error, conn, message, {signature, ts, body}}
       ok -> ok
     end
   end
@@ -118,4 +115,24 @@ defmodule SanityWebhookPlug do
         {:error, conn, "Could not find valid Sanity webhook signature header"}
     end
   end
+
+  defp maybe_debug(conn, true, {sig, ts, body}, secret) do
+    conn
+    |> Plug.Conn.put_private(:sanity_ts, ts)
+    |> Plug.Conn.put_private(:sanity_sig, sig)
+    |> Plug.Conn.put_private(:sanity_secret, secret)
+    |> Plug.Conn.put_private(:sanity_computed_sig, Signature.compute(ts, body, secret))
+    |> Plug.Conn.put_private(:sanity_payload, body)
+  end
+  defp maybe_debug(conn, false, _components, _secret), do: conn
+
+  defp handle_error(conn, true, json, error) do
+    conn
+    |> Plug.Conn.put_private(@plug_error_key, error)
+    |> Plug.Conn.put_resp_header("content-type", "application/json")
+    |> Plug.Conn.send_resp(:bad_request, json.encode!(%{error: error}))
+    |> Plug.Conn.halt()
+  end
+  defp handle_error(conn, false, _json, error),
+    do: Plug.Conn.put_private(conn, @plug_error_key, error)
 end
