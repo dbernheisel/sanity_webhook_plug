@@ -112,7 +112,7 @@ defmodule SanityWebhookPlug do
         %{"ts" => ts, "v1" => signature} =
           Regex.named_captures(~r/^t=(?<ts>\d+)[, ]v1=(?<v1>[^, ]+)$/, String.trim(header))
 
-        {:ok, conn, {String.to_integer(ts), signature}}
+        {:ok, conn, {String.to_integer(ts), String.trim(signature)}}
 
       _ ->
         {:error, conn, "Could not find valid Sanity webhook signature header"}
