@@ -81,6 +81,7 @@ For example, here's a controller that checks the error:
 ```elixir
 # assuming you have a route setup in your router to land in this controller.
 def MyAppWeb.SanityController do
+  use MyAppWeb, :controller
   require Logger
 
   def my_action(conn, params) do
