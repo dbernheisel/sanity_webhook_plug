@@ -24,7 +24,8 @@ defmodule SanityWebhookPlug do
       will be compiled. If not set, it will obtain via config
       `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
 
-  options forwarded to `Plug.Conn.read_body/2`:
+  Options forwarded to `Plug.Conn.read_body/2`:
+
   - `:length` - sets the number of bytes to read from the request at a time.
   - `:read_length` - sets the amount of bytes to read at one time from the underlying socket to fill the chunk.
   - `:read_timeout` - sets the timeout for each socket read.
@@ -70,22 +71,24 @@ defmodule SanityWebhookPlug do
 
   def call(conn, _opts), do: conn
 
+  @doc """
+  Get the Sanity Webhook error from the conn.
+  """
+  @spec get_error(Plug.Conn.t()) :: false | String.t()
+  def get_error(conn), do: conn.private[@plug_error_key]
+
+  @doc """
+  The expected header that contains the Sanity webhook signature and timestamp
+  """
+  @spec header() :: String.t()
+  def header, do: @header
+
   defp verify(conn, signature, ts, body, secret) do
     case Signature.verify(signature, ts, body, secret) do
       {:error, message} -> {:error, conn, message}
       ok -> ok
     end
   end
-
-  @doc """
-  Get the Sanity Webhook error from the conn.
-  """
-  def get_error(conn), do: conn.private[@plug_error_key]
-
-  @doc """
-  The expected header that contains the Sanity webhook signature and timestamp
-  """
-  def header, do: @header
 
   defp read_body(%{body_params: %Plug.Conn.Unfetched{}} = conn, read_opts) do
     read_body(conn, "", Plug.Conn.read_body(conn, read_opts), read_opts)
