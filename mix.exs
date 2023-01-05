@@ -6,7 +6,7 @@ defmodule SanityWebhookPlug.MixProject do
       app: :sanity_webhook_plug,
       version: "0.1.0",
       elixir: "~> 1.14",
-      preferred_cli_env: [dialyzer: :test, tests: :test],
+      preferred_cli_env: [dialyzer: :test, credo: :test, tests: :test],
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()
