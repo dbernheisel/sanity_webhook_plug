@@ -1,11 +1,11 @@
 defmodule SanityWebhookPlugTest do
   use ExUnit.Case
   use Plug.Test
-  import ExUnit.CaptureLog
   import ExUnit.CaptureIO
   alias SanityWebhookPlug.Signature
 
   def secret, do: {:ok, "test"}
+  def bare_secret, do: "test"
   def bad_secret, do: {:ok, "test2"}
   def error_secret, do: {:error, "no secret"}
 
@@ -15,10 +15,24 @@ defmodule SanityWebhookPlugTest do
   @good_hash "tLa470fx7qkLLEcMOcEUFuBbRSkGujyskxrNXcoh0N0"
   @good_signature "t=#{@good_ts},v1=#{@good_hash}"
   @opts [
-    path: ["/sanity", "/webhook"],
-    halt_on_error: true,
+    handler: __MODULE__.Handler,
+    at: "/sanity",
     secret: "test"
   ]
+
+  defmodule Handler do
+    def handle_event(conn, _params) do
+      Plug.Conn.send_resp(conn, 200, Jason.encode!(%{success: "ok"}))
+    end
+
+    def handle_error(conn, error) when is_binary(error) do
+      Plug.Conn.send_resp(conn, 400, Jason.encode!(%{error: error}))
+    end
+
+    def handle_error(conn, error) when is_exception(error) do
+      Plug.Conn.send_resp(conn, 400, Jason.encode!(%{error: "error"}))
+    end
+  end
 
   test "secret is not printed" do
     # credo:disable-for-lines:1
@@ -48,27 +62,6 @@ defmodule SanityWebhookPlugTest do
 
     refute conn.halted
     assert %{error: false} = conn.private.sanity_webhook_plug
-  end
-
-  test "works with multiple paths" do
-    # @opts contains multiple paths
-    conn =
-      @good_payload
-      |> setup_conn(@good_signature)
-      |> call(@opts)
-
-    refute conn.halted
-    assert %{error: false} = conn.private.sanity_webhook_plug
-  end
-
-  test "logs warning with no path set" do
-    assert capture_log(fn ->
-             opts = Keyword.delete(@opts, :path)
-
-             @good_payload
-             |> setup_conn(@good_signature)
-             |> call(opts)
-           end) =~ ":path is not set for SanityWebhookPlug; skipping plug"
   end
 
   test "skips without path match" do
@@ -144,6 +137,18 @@ defmodule SanityWebhookPlugTest do
     # --
 
     opts = Keyword.put(@opts, :secret, {__MODULE__, :secret, []})
+
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> call(opts)
+
+    refute conn.halted
+    assert %{error: false} = conn.private.sanity_webhook_plug
+
+    # --
+
+    opts = Keyword.put(@opts, :secret, {__MODULE__, :bare_secret, []})
 
     conn =
       @good_payload
@@ -233,7 +238,7 @@ defmodule SanityWebhookPlugTest do
 
     assert conn.halted
     assert %{error: %Jason.DecodeError{}} = conn.private.sanity_webhook_plug
-    assert conn.resp_body == Jason.encode!(%{error: "JSON decoding error"})
+    assert conn.resp_body == Jason.encode!(%{error: "error"})
   end
 
   test "works with smaller read lengths" do
@@ -245,21 +250,6 @@ defmodule SanityWebhookPlugTest do
       |> call(opts)
 
     refute conn.halted
-  end
-
-  test "does not halt with halt_on_error false" do
-    bad_payload = "{\"_id\":\"foo\"}"
-    opts = Keyword.put(@opts, :halt_on_error, false)
-
-    conn =
-      bad_payload
-      |> setup_conn(@good_signature)
-      |> call(opts)
-
-    refute conn.halted
-
-    assert %{error: "Sanity webhook signature does not match expected"} =
-             conn.private.sanity_webhook_plug
   end
 
   test "halts on incorrect header" do
@@ -281,7 +271,7 @@ defmodule SanityWebhookPlugTest do
 
   defp setup_conn(payload, signature) do
     :post
-    |> conn("/sanity", payload)
+    |> conn("/sanity?foo=bar", payload)
     |> put_req_header(SanityWebhookPlug.header(), signature)
     |> put_req_header("content-type", "application/json")
     |> put_req_header("user-agent", "Sanity.io webhook delivery")

@@ -32,7 +32,7 @@ Use this plug in your endpoint:
 # If using Plug or Phoenix, place before `plug Plug.Parsers`
 # For Phoenix apps, in lib/my_app_web/endpoint.ex:
 plug SanityWebhookPlug,
-  path: ["/webhooks/sanity/bust_cache"]
+  at: "/webhooks/sanity"
 ```
 
 You may alternatively configure the secret in config, which will be read during
@@ -58,15 +58,17 @@ and a error message.
 
 ### Options:
 
-- `:path` (required): The request paths to match against. Can either be a single
-    route or a list of routes. eg: `["/webhooks/sanity/bust_cache"]` or `"/sanity"`
-- `:halt_on_error` (default: `true`): Halt on error. If you want to handle errors
-    yourself, provide `false` and handle the error in your controller action.
+- `:at` (required): The request path to match against. eg, `"/webhooks/sanity"`
+- `:handler` (required): The controller-like module that responds to
+    `handle_event/2` that is passed the conn and the params, and
+    `handle_error/2` that is passed the conn and the error. The error may be an
+    exception or a string.
 - `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will
     be called at runtime, otherwise it will be compiled. If not set, it will
-    obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`.
+    obtain via `Application.get_env(:sanity_webhook_plug, :webhook_secret)`.
     If supplying an MFA or function reference, it must return `{:ok, my_secret}`
-- `:json_library`: JSON encoding library. When not supplied, it will use choose
+    or a string.
+- `:json_decoder`: JSON encoding library. When not supplied, it will use choose
     Phoenix's configured library, `Jason`, or `Poison`. Sanity requires
     JSON-encoded responses.
 
@@ -79,31 +81,38 @@ Options forwarded to `Plug.Conn.read_body/2`:
 
 ### Handle Errors Yourself
 
-If you want to handle errors yourself, you may configure the plug to
-`halt_on_error: false` and handle the error yourself. If an error occurs, you
-can get it with `SanityWebhookPlug.get_debug(conn)` and handle it yourself.
+If errors occur, you need to handle them yourself. You can inspect the context
+of the webhook with `SanityWebhookPlug.get_debug(conn)`.
 
-For example, here's a controller that checks the error:
+
+### Full example
+
+For example, here's a controller:
 
 ```elixir
-# assuming you have a route setup in your router to land in this controller.
-def MyAppWeb.SanityController do
+def MyAppWeb.SanityWebhookHandler do
   use MyAppWeb, :controller
   require Logger
 
-  def my_action(conn, params) do
+  # handle known events
+  def handle_event(conn, %{"_id" => id, "_type" => type}) do
     # ... do your normal thing
+    json(conn, %{ok: "processed"})
   end
 
-  def action(conn, _) do
-    debug = SanityWebhookPlug.debug(conn)
-    if debug.error do
-      # secret is present in the struct, but will not be present during inspect
-      Logger.error("Sanity Webhook error: #{inspect(debug)}")
-      Plug.Conn.resp(conn, 500, "Error: #{debug.error}")
-    else
-      apply(__MODULE__, action_name(conn), [conn, conn.params])
-    end
+  # have a pass-thru handler
+  def handle_event(conn, _params) do
+    Logger.warn("Unhandled webhook #{inspect(params)}")
+    json(conn, %{ok: "unhandled"})
+  end
+
+  # handle errors
+  def handle_error(conn, error) do
+    debug = SanityWebhookPlug.get_debug(conn)
+    Logger.error("Sanity Webhook error: #{inspect(debug)}")
+    conn
+    |> put_status(500)
+    |> json(%{error: inspect(error)})
   end
 end
 ```
