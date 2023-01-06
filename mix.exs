@@ -12,7 +12,9 @@ defmodule SanityWebhookPlug.MixProject do
       aliases: aliases(),
       package: package(),
       deps: deps(),
-      docs: docs()
+      docs: docs(),
+      description:
+        "Plug for handling Sanity.io GROQ-powered webhooks"
     ]
   end
 
@@ -45,7 +47,8 @@ defmodule SanityWebhookPlug.MixProject do
         "GitHub" => "https://github.com/bitfo/sanity_webhook_plug",
         "Readme" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/README.md",
         "Changelog" =>
-          "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md"
+          "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md",
+        "Sanity Webhook Docs" => "https://www.sanity.io/docs/webhooks"
       }
     }
   end
