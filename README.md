@@ -32,7 +32,8 @@ Use this plug in your endpoint:
 # If using Plug or Phoenix, place before `plug Plug.Parsers`
 # For Phoenix apps, in lib/my_app_web/endpoint.ex:
 plug SanityWebhookPlug,
-  at: "/webhooks/sanity"
+  at: "/webhooks/sanity",
+  handler: MyAppWeb.SanityWebhookHandler
 ```
 
 You may alternatively configure the secret in config, which will be read during
@@ -50,8 +51,8 @@ protect your system by limiting how much of body to read to prevent exhaustion.
 Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
 should also have here for SanityWebhookPlug.
 
-The body will be read into the plug conn's key `:params` which matches Phoenix
-behavior.
+The body and query params will be read into the plug conn's key `:params` which
+matches Phoenix behavior.
 
 By default, errors will be handled by the plug by responding with a 400 error
 and a error message.
@@ -84,34 +85,44 @@ Options forwarded to `Plug.Conn.read_body/2`:
 If errors occur, you need to handle them yourself. You can inspect the context
 of the webhook with `SanityWebhookPlug.get_debug(conn)`.
 
+### Example
 
-### Full example
-
-For example, here's a controller:
+For example:
 
 ```elixir
+## In lib/my_app_web/endpoint.ex
+
+# before Plug.Parsers
+plug SanityWebhookPlug,
+  at: "/webhooks/sanity",
+  handler: MyAppWeb.SanityWebhookHandler
+
+## in lib/my_app_web/controllers/sanity_webhook_handler.ex
+
 def MyAppWeb.SanityWebhookHandler do
   use MyAppWeb, :controller
   require Logger
 
   # handle known events
-  def handle_event(conn, %{"_id" => id, "_type" => type}) do
-    # ... do your normal thing
-    json(conn, %{ok: "processed"})
+  def handle_event(conn, %{"_type" => type, "_id" => id}) do
+    # do something
+    json(conn, %{success: "Did the thing!"})
   end
 
-  # have a pass-thru handler
-  def handle_event(conn, _params) do
-    Logger.warn("Unhandled webhook #{inspect(params)}")
-    json(conn, %{ok: "unhandled"})
+  def handle_event(conn, params) do
+    Logger.warn("SanityWebhook: unhandled webhook: #{inspect(params)}")
+
+    conn
+    |> put_status(500)
+    |> json(%{error: "unhandled webhook"})
   end
 
-  # handle errors
   def handle_error(conn, error) do
     debug = SanityWebhookPlug.get_debug(conn)
     Logger.error("Sanity Webhook error: #{inspect(debug)}")
+
     conn
-    |> put_status(500)
+    |> put_status(400)
     |> json(%{error: inspect(error)})
   end
 end
