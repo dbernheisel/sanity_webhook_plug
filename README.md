@@ -32,7 +32,8 @@ Use this plug in your endpoint:
 # If using Plug or Phoenix, place before `plug Plug.Parsers`
 # For Phoenix apps, in lib/my_app_web/endpoint.ex:
 plug SanityWebhookPlug,
-  path: ["/webhooks/sanity/bust_cache"]
+  at: "/webhooks/sanity",
+  handler: MyAppWeb.SanityWebhookHandler
 ```
 
 You may alternatively configure the secret in config, which will be read during
@@ -44,25 +45,35 @@ config :sanity_webhook_plug,
   secret: System.get_env("SANITY_WEBHOOK_SECRET")
 ```
 
-Verifying the signature requires reading the body, but its best to do this
-before _interpreting_ the body into JSON or other parsed formats. Plug can
-protect your system by limiting how much of body to read to prevent exhaustion.
-Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
-should also have here for SanityWebhookPlug.
+Define a handler to handle webhooks:
 
-By default, errors will be handled by the plug by responding with a 400 error
-and a error message.
+```elixir
+defmodule MyAppWeb.SanityWebhookHandler do
+  @behaviour SanityWebhookPlug.Handler
+
+  def handle_event(conn, params) do
+    conn
+  end
+
+  def handle_error(conn, error) do
+    conn
+  end
+end
+```
 
 ### Options:
 
-- `:path` (required): The request paths to match against. Can either be a single
-    route or a list of routes. eg: `["/webhooks/sanity/bust_cache"]` or `"/sanity"`
-- `:halt_on_error` (default: `true`): Halt on error. If you want to handle errors
-    yourself, provide `false` and handle the error in your controller action.
+- `:at` (required): The request path to match against. eg, `"/webhooks/sanity"`
+- `:handler` (required): The controller-like module that responds to
+    `handle_event/2` that is passed the conn and the params, and
+    `handle_error/2` that is passed the conn and the error. The error may be an
+    exception or a string.
 - `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will
     be called at runtime, otherwise it will be compiled. If not set, it will
-    obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
-- `:json_library`: JSON encoding library. When not supplied, it will use choose
+    obtain via `Application.get_env(:sanity_webhook_plug, :webhook_secret)`.
+    If supplying an MFA or function reference, it must return `{:ok, my_secret}`
+    or a string.
+- `:json_decoder`: JSON encoding library. When not supplied, it will use choose
     Phoenix's configured library, `Jason`, or `Poison`. Sanity requires
     JSON-encoded responses.
 
@@ -73,31 +84,63 @@ Options forwarded to `Plug.Conn.read_body/2`:
     underlying socket to fill the chunk.
 - `:read_timeout` - sets the timeout for each socket read.
 
-### Handle Errors Yourself
+Verifying the signature requires reading the body, but its best to do this
+before _interpreting_ the body into JSON or other parsed formats. Plug can
+protect your system by limiting how much of body to read to prevent exhaustion.
+Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
+should also have for SanityWebhookPlug.
 
-If you want to handle errors yourself, you may configure the plug to
-`halt_on_error: false` and handle the error yourself. If an error occurs, you
-can get it with `SanityWebhookPlug.get_error(conn)` and handle it yourself.
+The body and query params will be read into the plug conn's key `:params` which
+matches Phoenix behavior.
 
-For example, here's a controller that checks the error:
+### Example
+
+An example using Phoenix
 
 ```elixir
-# assuming you have a route setup in your router to land in this controller.
-def MyAppWeb.SanityController do
+## In lib/my_app_web/endpoint.ex
+
+# place before Plug.Parsers
+defmodule MyAppWeb.Endpoint do
+  use Phoenix.Endpoint, otp_app: :my_app
+
+  # ...
+
+  plug SanityWebhookPlug,
+  at: "/webhooks/sanity",
+  handler: MyAppWeb.SanityWebhookHandler
+
+  # Plug.Parsers down here somewhere
+end
+
+
+## in lib/my_app_web/controllers/sanity_webhook_handler.ex
+def MyAppWeb.SanityWebhookHandler do
   use MyAppWeb, :controller
   require Logger
+  @behaviour SanityWebhookPlug.Handler
 
-  def my_action(conn, params) do
-    # ... do your normal thing
+  # handle known events
+  def handle_event(conn, %{"_type" => type, "_id" => id}) do
+    # do something
+    json(conn, %{success: "Did the thing!"})
   end
 
-  def action(conn, _) do
-    if message = SanityWebhookPlug.get_error(conn) do
-      Logger.error("Sanity Webhook error: " <> message)
-      Plug.Conn.resp(conn, 500, "Error: " <> message)
-    else
-      apply(__MODULE__, action_name(conn), [conn, conn.params])
-    end
+  def handle_event(conn, params) do
+    Logger.warn("SanityWebhook: unhandled webhook: #{inspect(params)}")
+
+    conn
+    |> put_status(500)
+    |> json(%{error: "unhandled webhook"})
+  end
+
+  def handle_error(conn, error) do
+    debug = SanityWebhookPlug.get_debug(conn)
+    Logger.error("SanityWebhook error: #{inspect(debug)}")
+
+    conn
+    |> put_status(400)
+    |> json(%{error: inspect(error)})
   end
 end
 ```
