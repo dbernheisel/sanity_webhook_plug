@@ -3,11 +3,13 @@ defmodule SanityWebhookPlugTest do
   use Plug.Test
   import ExUnit.CaptureLog
   import ExUnit.CaptureIO
+  alias SanityWebhookPlug.Signature
 
   def secret, do: {:ok, "test"}
   def bad_secret, do: {:ok, "test2"}
   def error_secret, do: {:error, "no secret"}
 
+  @test_payload File.read!("test/support/test.jpg")
   @good_payload Jason.encode!(%{"_id" => "resume"})
   @good_ts 1_633_519_811_129
   @good_hash "tLa470fx7qkLLEcMOcEUFuBbRSkGujyskxrNXcoh0N0"
@@ -21,6 +23,19 @@ defmodule SanityWebhookPlugTest do
   test "secret is not printed" do
     # credo:disable-for-lines:1
     refute capture_io(fn -> IO.inspect(%SanityWebhookPlug{secret: "foo"}) end) =~ "foo"
+  end
+
+  test "base64url encoding and decoding" do
+    original = "ladies and gentlemen, we are floating in space"
+    encoded = "bGFkaWVzIGFuZCBnZW50bGVtZW4sIHdlIGFyZSBmbG9hdGluZyBpbiBzcGFjZQ"
+    assert Signature.base64url_encode(original) == encoded
+    assert Signature.base64url_decode(encoded) == original
+
+    bin = Signature.base64url_encode(@test_payload)
+    refute String.contains?(bin, "+")
+    refute String.contains?(bin, "/")
+    refute String.contains?(bin, "=")
+    assert Signature.base64url_decode(bin) == @test_payload
   end
 
   test "works with single path" do
@@ -93,7 +108,7 @@ defmodule SanityWebhookPlugTest do
     refute conn.halted
     assert debug.error == false
     assert debug.computed == computed
-    assert debug.signature == @good_hash
+    assert debug.hash == @good_hash
     assert debug.ts == @good_ts
     assert debug.body == nil
     assert debug.secret == @opts[:secret]
@@ -155,8 +170,8 @@ defmodule SanityWebhookPlugTest do
     debug = conn.private.sanity_webhook_plug
     assert debug.error == expected_message
     assert debug.computed == "MvOplWzHD4SnEHitPZJmur5XzUATpQdN4oFX1ndiW7g"
-    assert debug.signature == @good_hash
-    assert debug.computed != debug.signature
+    assert debug.hash == @good_hash
+    assert debug.computed != debug.hash
     assert debug.ts == bad_ts
     assert debug.body == @good_payload
     assert debug.secret == @opts[:secret]
@@ -193,7 +208,7 @@ defmodule SanityWebhookPlugTest do
   end
 
   test "halts on incorrect signature - payload" do
-    bad_payload = <<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>
+    bad_payload = "{\"_id\":\"foo\"}"
 
     conn =
       bad_payload
@@ -204,6 +219,21 @@ defmodule SanityWebhookPlugTest do
     assert conn.halted
     assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
+  end
+
+  test "json decoding errors" do
+    binary = <<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>
+    {:ok, hash} = Signature.compute(@good_ts, binary, @opts[:secret])
+    signature = "t=#{@good_ts},v1=#{hash}"
+
+    conn =
+      binary
+      |> setup_conn(signature)
+      |> call(@opts)
+
+    assert conn.halted
+    assert %{error: %Jason.DecodeError{}} = conn.private.sanity_webhook_plug
+    assert conn.resp_body == Jason.encode!(%{error: "JSON decoding error"})
   end
 
   test "works with smaller read lengths" do
@@ -218,7 +248,7 @@ defmodule SanityWebhookPlugTest do
   end
 
   test "does not halt with halt_on_error false" do
-    bad_payload = <<0, 1, 2, 3, 4, 5, 6, 7, 8, 9>>
+    bad_payload = "{\"_id\":\"foo\"}"
     opts = Keyword.put(@opts, :halt_on_error, false)
 
     conn =

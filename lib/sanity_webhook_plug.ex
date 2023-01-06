@@ -16,11 +16,11 @@ defmodule SanityWebhookPlug do
           computed: String.t(),
           error: String.t() | false,
           secret: String.t(),
-          signature: String.t(),
+          hash: String.t(),
           ts: pos_integer()
         }
 
-  defstruct [:body, :computed, :secret, :signature, :ts, error: false]
+  defstruct [:body, :computed, :secret, :hash, :ts, error: false]
 
   @header "sanity-webhook-signature"
   @plug_key :sanity_webhook_plug
@@ -62,34 +62,44 @@ defmodule SanityWebhookPlug do
     end
   end
 
-  def call(conn, [secret, read_opts, halt_on_error, json]) do
+  def call(conn, [secret, read_opts, halt_on_error, json_mod]) do
     with {:ok, secret} <- get_secret(secret),
          {:ok, conn, body} <- read_body(conn, read_opts),
-         {:ok, conn, {ts, signature}} <- get_signature(conn),
-         :ok <- verify(conn, signature, ts, body, secret) do
-      put_debug(conn, {signature, ts, nil}, signature, secret)
+         {:ok, conn, {ts, hash}} <- get_signature(conn),
+         :ok <- verify(conn, hash, ts, body, secret),
+         {:ok, json} <- parse(json_mod, body, conn, ts, hash) do
+      conn
+      |> put_debug({hash, ts, nil}, hash, secret)
+      |> Map.put(:params, json)
     else
       {:error, error} ->
-        # Bad secret
+        # Bad secret or bad JSON decoding
         conn
         |> put_debug(nil, nil, secret)
-        |> handle_error(halt_on_error, json, error)
+        |> handle_error(halt_on_error, json_mod, error)
 
       {:error, error, conn} ->
         # Bad body read or no header
         conn
         |> put_debug(nil, nil, secret)
-        |> handle_error(halt_on_error, json, error)
+        |> handle_error(halt_on_error, json_mod, error)
 
       {:error, error, conn, components, computed} ->
         # Bad signature
         conn
         |> put_debug(components, computed, secret)
-        |> handle_error(halt_on_error, json, error)
+        |> handle_error(halt_on_error, json_mod, error)
     end
   end
 
   def call(conn, _opts), do: conn
+
+  defp parse(json_mod, body, conn, ts, hash) do
+    case json_mod.decode(body) do
+      {:ok, json} -> {:ok, json}
+      {:error, error} -> {:error, error, conn, {ts, hash, body}, nil}
+    end
+  end
 
   @doc """
   Get the Sanity Webhook debug information from the conn.
@@ -103,9 +113,9 @@ defmodule SanityWebhookPlug do
   @spec header() :: String.t()
   def header, do: @header
 
-  defp verify(conn, signature, ts, body, secret) do
-    case Signature.verify(signature, ts, body, secret) do
-      {:error, message, computed} -> {:error, message, conn, {signature, ts, body}, computed}
+  defp verify(conn, hash, ts, body, secret) do
+    case Signature.verify(hash, ts, body, secret) do
+      {:error, message, computed} -> {:error, message, conn, {hash, ts, body}, computed}
       ok -> ok
     end
   end
@@ -129,10 +139,10 @@ defmodule SanityWebhookPlug do
   defp get_signature(conn) do
     case Plug.Conn.get_req_header(conn, @header) do
       [header] ->
-        %{"ts" => ts, "v1" => signature} =
+        %{"ts" => ts, "v1" => hash} =
           Regex.named_captures(~r/^t=(?<ts>\d+)[, ]v1=(?<v1>[^, ]+)$/, String.trim(header))
 
-        {:ok, conn, {String.to_integer(ts), String.trim(signature)}}
+        {:ok, conn, {String.to_integer(ts), String.trim(hash)}}
 
       _ ->
         {:error, "Could not find valid Sanity webhook signature header", conn}
@@ -140,14 +150,15 @@ defmodule SanityWebhookPlug do
   end
 
   defp put_debug(conn, nil, nil, secret) do
-    Plug.Conn.put_private(conn, @plug_key, %__MODULE__{
-      secret: secret
-    })
+    secret = secret |> get_secret() |> elem(1)
+    Plug.Conn.put_private(conn, @plug_key, %__MODULE__{secret: secret})
   end
 
-  defp put_debug(conn, {sig, ts, body}, computed, secret) do
+  defp put_debug(conn, {hash, ts, body}, computed, secret) do
+    {:ok, secret} = get_secret(secret)
+
     Plug.Conn.put_private(conn, @plug_key, %__MODULE__{
-      signature: sig,
+      hash: hash,
       ts: ts,
       computed: computed,
       secret: secret,
@@ -159,7 +170,7 @@ defmodule SanityWebhookPlug do
     conn
     |> Plug.Conn.put_private(@plug_key, %{conn.private[@plug_key] | error: error})
     |> Plug.Conn.put_resp_header("content-type", "application/json")
-    |> Plug.Conn.send_resp(:bad_request, json.encode!(%{error: error}))
+    |> Plug.Conn.send_resp(:bad_request, json.encode!(format_error(error)))
     |> Plug.Conn.halt()
   end
 
@@ -167,9 +178,14 @@ defmodule SanityWebhookPlug do
     Plug.Conn.put_private(conn, @plug_key, %{conn.private[@plug_key] | error: error})
   end
 
+  defp format_error(error) when is_binary(error), do: %{error: error}
+  defp format_error(error) when is_exception(error), do: %{error: "JSON decoding error"}
+
   defp get_secret({m, f, a}), do: get_secret(apply(m, f, a))
   defp get_secret(fun) when is_function(fun), do: get_secret(fun.())
   defp get_secret({:ok, secret}) when is_binary(secret), do: {:ok, secret}
+  defp get_secret({:ok, nil}), do: get_secret(nil)
+  defp get_secret({:error, _} = error), do: error
   defp get_secret(secret) when is_binary(secret), do: {:ok, secret}
 
   defp get_secret(nil) do

@@ -50,6 +50,9 @@ protect your system by limiting how much of body to read to prevent exhaustion.
 Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
 should also have here for SanityWebhookPlug.
 
+The body will be read into the plug conn's key `:params` which matches Phoenix
+behavior.
+
 By default, errors will be handled by the plug by responding with a 400 error
 and a error message.
 
