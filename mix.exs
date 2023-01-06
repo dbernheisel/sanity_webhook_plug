@@ -13,8 +13,7 @@ defmodule SanityWebhookPlug.MixProject do
       package: package(),
       deps: deps(),
       docs: docs(),
-      description:
-        "Plug for handling Sanity.io GROQ-powered webhooks"
+      description: "Plug for handling Sanity.io GROQ-powered webhooks"
     ]
   end
 

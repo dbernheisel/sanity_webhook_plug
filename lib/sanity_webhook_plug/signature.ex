@@ -5,11 +5,13 @@ defmodule SanityWebhookPlug.Signature do
 
   @minimum_ts 1_609_459_200_000
 
+  @type secret :: mfa() | (() -> String.t() | {:ok, String.t()}) | String.t()
+
   @doc """
   Verify a payload, timestamp, and secret against a computed signature
   """
-  @spec verify(String.t(), pos_integer(), binary(), String.t()) ::
-          :ok | {:error, String.t() | term(), String.t()}
+  @spec verify(String.t(), pos_integer(), binary(), secret()) ::
+          :ok | {:error, String.t(), String.t()}
   def verify(hash, ts, payload, secret) do
     case compute(ts, payload, secret) do
       {:ok, computed} ->
