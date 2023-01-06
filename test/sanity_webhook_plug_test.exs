@@ -2,9 +2,11 @@ defmodule SanityWebhookPlugTest do
   use ExUnit.Case
   use Plug.Test
   import ExUnit.CaptureLog
+  import ExUnit.CaptureIO
 
-  def secret, do: "test"
-  def bad_secret, do: "test2"
+  def secret, do: {:ok, "test"}
+  def bad_secret, do: {:ok, "test2"}
+  def error_secret, do: {:error, "no secret"}
 
   @good_payload Jason.encode!(%{"_id" => "resume"})
   @good_ts 1_633_519_811_129
@@ -16,6 +18,11 @@ defmodule SanityWebhookPlugTest do
     secret: "test"
   ]
 
+  test "secret is not printed" do
+    # credo:disable-for-lines:1
+    refute capture_io(fn -> IO.inspect(%SanityWebhookPlug{secret: "foo"}) end) =~ "foo"
+  end
+
   test "works with single path" do
     opts = Keyword.put(@opts, :path, "/sanity")
 
@@ -25,7 +32,7 @@ defmodule SanityWebhookPlugTest do
       |> call(opts)
 
     refute conn.halted
-    assert conn.private.sanity_webhook_error == false
+    assert %{error: false} = conn.private.sanity_webhook_plug
   end
 
   test "works with multiple paths" do
@@ -36,7 +43,7 @@ defmodule SanityWebhookPlugTest do
       |> call(@opts)
 
     refute conn.halted
-    assert conn.private.sanity_webhook_error == false
+    assert %{error: false} = conn.private.sanity_webhook_plug
   end
 
   test "logs warning with no path set" do
@@ -82,8 +89,14 @@ defmodule SanityWebhookPlugTest do
       |> setup_conn(@good_signature)
       |> call(@opts)
 
+    debug = conn.private.sanity_webhook_plug
     refute conn.halted
-    assert conn.private.sanity_webhook_error == false
+    assert debug.error == false
+    assert debug.computed == computed
+    assert debug.signature == @good_hash
+    assert debug.ts == @good_ts
+    assert debug.body == nil
+    assert debug.secret == @opts[:secret]
   end
 
   test "reads secret from MFA" do
@@ -97,7 +110,23 @@ defmodule SanityWebhookPlugTest do
     expected_message = "Sanity webhook signature does not match expected"
     assert conn.halted
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
-    assert conn.private.sanity_webhook_error == expected_message
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
+
+    # --
+
+    opts = Keyword.put(@opts, :secret, &__MODULE__.error_secret/0)
+
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> call(opts)
+
+    expected_message = "no secret"
+    assert conn.halted
+    assert conn.resp_body == Jason.encode!(%{error: expected_message})
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
+
+    # --
 
     opts = Keyword.put(@opts, :secret, {__MODULE__, :secret, []})
 
@@ -107,7 +136,7 @@ defmodule SanityWebhookPlugTest do
       |> call(opts)
 
     refute conn.halted
-    assert conn.private.sanity_webhook_error == false
+    assert %{error: false} = conn.private.sanity_webhook_plug
   end
 
   test "halts on incorrect signature - timestamp" do
@@ -122,7 +151,15 @@ defmodule SanityWebhookPlugTest do
     expected_message = "Sanity webhook signature does not match expected"
     assert conn.halted
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
-    assert conn.private.sanity_webhook_error == expected_message
+
+    debug = conn.private.sanity_webhook_plug
+    assert debug.error == expected_message
+    assert debug.computed == "MvOplWzHD4SnEHitPZJmur5XzUATpQdN4oFX1ndiW7g"
+    assert debug.signature == @good_hash
+    assert debug.computed != debug.signature
+    assert debug.ts == bad_ts
+    assert debug.body == @good_payload
+    assert debug.secret == @opts[:secret]
   end
 
   test "halts on incorrect signature - old timestamp" do
@@ -137,7 +174,7 @@ defmodule SanityWebhookPlugTest do
     assert conn.halted
 
     expected_message = "Timestamp 123 is too early to be a valid Sanity webhook"
-    assert conn.private.sanity_webhook_error == expected_message
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
   end
 
@@ -151,7 +188,7 @@ defmodule SanityWebhookPlugTest do
 
     expected_message = "Sanity webhook signature does not match expected"
     assert conn.halted
-    assert conn.private.sanity_webhook_error == expected_message
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
   end
 
@@ -165,7 +202,7 @@ defmodule SanityWebhookPlugTest do
 
     expected_message = "Sanity webhook signature does not match expected"
     assert conn.halted
-    assert conn.private.sanity_webhook_error == expected_message
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
   end
 
@@ -190,7 +227,9 @@ defmodule SanityWebhookPlugTest do
       |> call(opts)
 
     refute conn.halted
-    assert conn.private.sanity_webhook_error == "Sanity webhook signature does not match expected"
+
+    assert %{error: "Sanity webhook signature does not match expected"} =
+             conn.private.sanity_webhook_plug
   end
 
   test "halts on incorrect header" do
@@ -206,7 +245,7 @@ defmodule SanityWebhookPlugTest do
     assert conn.halted
 
     expected_message = "Could not find valid Sanity webhook signature header"
-    assert conn.private.sanity_webhook_error == expected_message
+    assert %{error: ^expected_message} = conn.private.sanity_webhook_plug
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
   end
 

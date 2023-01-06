@@ -61,7 +61,8 @@ and a error message.
     yourself, provide `false` and handle the error in your controller action.
 - `:secret`: The Sanity webhook secret. eg: `123abc`. Supplying an MFA tuple will
     be called at runtime, otherwise it will be compiled. If not set, it will
-    obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`
+    obtain via config `Application.get_env(:sanity_webhook_plug, :webhook_secret)`.
+    If supplying an MFA or function reference, it must return `{:ok, my_secret}`
 - `:json_library`: JSON encoding library. When not supplied, it will use choose
     Phoenix's configured library, `Jason`, or `Poison`. Sanity requires
     JSON-encoded responses.
@@ -77,7 +78,7 @@ Options forwarded to `Plug.Conn.read_body/2`:
 
 If you want to handle errors yourself, you may configure the plug to
 `halt_on_error: false` and handle the error yourself. If an error occurs, you
-can get it with `SanityWebhookPlug.get_error(conn)` and handle it yourself.
+can get it with `SanityWebhookPlug.get_debug(conn)` and handle it yourself.
 
 For example, here's a controller that checks the error:
 
@@ -92,9 +93,11 @@ def MyAppWeb.SanityController do
   end
 
   def action(conn, _) do
-    if message = SanityWebhookPlug.get_error(conn) do
-      Logger.error("Sanity Webhook error: " <> message)
-      Plug.Conn.resp(conn, 500, "Error: " <> message)
+    debug = SanityWebhookPlug.debug(conn)
+    if debug.error do
+      # secret is present in the struct, but will not be present during inspect
+      Logger.error("Sanity Webhook error: #{inspect(debug)}")
+      Plug.Conn.resp(conn, 500, "Error: #{debug.error}")
     else
       apply(__MODULE__, action_name(conn), [conn, conn.params])
     end
