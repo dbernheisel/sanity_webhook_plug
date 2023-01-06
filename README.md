@@ -45,17 +45,21 @@ config :sanity_webhook_plug,
   secret: System.get_env("SANITY_WEBHOOK_SECRET")
 ```
 
-Verifying the signature requires reading the body, but its best to do this
-before _interpreting_ the body into JSON or other parsed formats. Plug can
-protect your system by limiting how much of body to read to prevent exhaustion.
-Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
-should also have here for SanityWebhookPlug.
+Define a handler to handle webhooks:
 
-The body and query params will be read into the plug conn's key `:params` which
-matches Phoenix behavior.
+```elixir
+defmodule MyAppWeb.SanityWebhookHandler do
+  @behaviour SanityWebhookPlug.Handler
 
-By default, errors will be handled by the plug by responding with a 400 error
-and a error message.
+  def handle_event(conn, params) do
+    conn
+  end
+
+  def handle_error(conn, error) do
+    conn
+  end
+end
+```
 
 ### Options:
 
@@ -80,28 +84,41 @@ Options forwarded to `Plug.Conn.read_body/2`:
     underlying socket to fill the chunk.
 - `:read_timeout` - sets the timeout for each socket read.
 
-### Handle Errors Yourself
+Verifying the signature requires reading the body, but its best to do this
+before _interpreting_ the body into JSON or other parsed formats. Plug can
+protect your system by limiting how much of body to read to prevent exhaustion.
+Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
+should also have for SanityWebhookPlug.
 
-If errors occur, you need to handle them yourself. You can inspect the context
-of the webhook with `SanityWebhookPlug.get_debug(conn)`.
+The body and query params will be read into the plug conn's key `:params` which
+matches Phoenix behavior.
 
 ### Example
 
-For example:
+An example using Phoenix
 
 ```elixir
 ## In lib/my_app_web/endpoint.ex
 
-# before Plug.Parsers
-plug SanityWebhookPlug,
+# place before Plug.Parsers
+defmodule MyAppWeb.Endpoint do
+  use Phoenix.Endpoint, otp_app: :my_app
+
+  # ...
+
+  plug SanityWebhookPlug,
   at: "/webhooks/sanity",
   handler: MyAppWeb.SanityWebhookHandler
 
-## in lib/my_app_web/controllers/sanity_webhook_handler.ex
+  # Plug.Parsers down here somewhere
+end
 
+
+## in lib/my_app_web/controllers/sanity_webhook_handler.ex
 def MyAppWeb.SanityWebhookHandler do
   use MyAppWeb, :controller
   require Logger
+  @behaviour SanityWebhookPlug.Handler
 
   # handle known events
   def handle_event(conn, %{"_type" => type, "_id" => id}) do
@@ -119,7 +136,7 @@ def MyAppWeb.SanityWebhookHandler do
 
   def handle_error(conn, error) do
     debug = SanityWebhookPlug.get_debug(conn)
-    Logger.error("Sanity Webhook error: #{inspect(debug)}")
+    Logger.error("SanityWebhook error: #{inspect(debug)}")
 
     conn
     |> put_status(400)
