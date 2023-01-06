@@ -50,13 +50,28 @@ Define a handler to handle webhooks:
 ```elixir
 defmodule MyAppWeb.SanityWebhookHandler do
   @behaviour SanityWebhookPlug.Handler
+  alias Plug.Conn
 
+  # see below for an example using Phoenix
+
+  @impl SanityWebhookPlug.Handler
   def handle_event(conn, params) do
+    # Process and return the conn
+
     conn
+    |> Conn.put_resp_header("content-type", "application/json")
+    |> Conn.send_resp(200, Jason.encode!({success: "yay!"}))
+    |> Conn.halt()
   end
 
+  @impl SanityWebhookPlug.Handler
   def handle_error(conn, error) do
+    # Process and return the conn
+
     conn
+    |> Conn.put_resp_header("content-type", "application/json")
+    |> Conn.send_resp(500, Jason.encode!({error: "uh oh!"}))
+    |> Conn.halt()
   end
 end
 ```
@@ -90,7 +105,7 @@ protect your system by limiting how much of body to read to prevent exhaustion.
 Ideally, any of these settings you have for `Plug.Parsers` in your endpoint, you
 should also have for SanityWebhookPlug.
 
-The body and query params will be read into the plug conn's key `:params` which
+The body and query params will be merged and given to your handler, which
 matches Phoenix behavior.
 
 ### Example
