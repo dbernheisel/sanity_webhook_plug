@@ -13,6 +13,8 @@ defmodule SanityWebhookPlug.MixProject do
       package: package(),
       deps: deps(),
       docs: docs(),
+      homepage_url: "https://hexdocs.pm/sanity_webhook_plug",
+      source_url: "https://github.com/bitfo/sanity_webhook_plug",
       description: "Plug for handling Sanity.io GROQ-powered webhooks"
     ]
   end
