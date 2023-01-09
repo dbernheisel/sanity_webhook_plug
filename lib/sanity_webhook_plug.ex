@@ -50,6 +50,7 @@ defmodule SanityWebhookPlug do
   Process the conn for a Sanity Webhook and verify its authenticity.
   """
   def call(conn, opts)
+
   def call(%Plug.Conn{path_info: path_info} = conn, [path_info | opts]) do
     call(conn, opts)
   end
