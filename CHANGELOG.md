@@ -2,6 +2,8 @@
 
 ## unreleased
 
+- Skip halted conns
+
 ## 0.1.1 (2023-01-09)
 
 - Halt conn after successful event
