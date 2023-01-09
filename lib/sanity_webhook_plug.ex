@@ -63,6 +63,7 @@ defmodule SanityWebhookPlug do
       conn
       |> put_debug({hash, ts, nil}, hash, secret, false)
       |> handler.handle_event(json)
+      |> Plug.Conn.halt()
     else
       {:error, error} ->
         # Bad secret or bad JSON decoding
