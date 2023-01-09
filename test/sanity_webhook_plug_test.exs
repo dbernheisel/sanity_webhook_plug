@@ -227,6 +227,17 @@ defmodule SanityWebhookPlugTest do
     assert conn.resp_body == Jason.encode!(%{error: "error"})
   end
 
+  test "skips when already halted" do
+    conn =
+      @good_payload
+      |> setup_conn(@good_signature)
+      |> Plug.Conn.halt()
+      |> call(@opts)
+
+    assert conn.halted
+    refute SanityWebhookPlug.get_debug(conn)
+  end
+
   # test "works with smaller read lengths" do
   #   opts = Keyword.put(@opts, :length, 8)
   #

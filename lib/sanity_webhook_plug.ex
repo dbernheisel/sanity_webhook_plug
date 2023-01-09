@@ -51,6 +51,7 @@ defmodule SanityWebhookPlug do
   """
   def call(conn, opts)
 
+  def call(%Plug.Conn{halted: true} = conn, _), do: conn
   def call(%Plug.Conn{path_info: path_info} = conn, [path_info | opts]) do
     call(conn, opts)
   end
