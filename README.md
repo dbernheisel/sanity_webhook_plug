@@ -19,7 +19,7 @@ webhooks](https://www.sanity.io/docs/webhooks)
 ```elixir
 def deps do
   [
-    {:sanity_webhook_plug, "~> 0.1.0"}
+    {:sanity_webhook_plug, "~> 0.1.1"}
   ]
 end
 ```
