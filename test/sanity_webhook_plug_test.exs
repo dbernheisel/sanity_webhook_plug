@@ -262,6 +262,28 @@ defmodule SanityWebhookPlugTest do
     assert conn.resp_body == Jason.encode!(%{error: expected_message})
   end
 
+  describe "make_header" do
+    test "generates a signature tuple" do
+      dt = DateTime.new!(~D[2023-01-01], ~T[00:00:00], "Etc/UTC")
+      body = "foo"
+      secret = bare_secret()
+
+      assert SanityWebhookPlug.make_header(dt, body, secret) ==
+               {"sanity-webhook-signature",
+                "t=1672531200000,v1=dMWBgdDyejVsuXjFpQD-nMtulFv1pE2BBz5cNNzINcA"}
+
+      dt = 1_672_531_200_000
+
+      assert SanityWebhookPlug.make_header(dt, body, secret) ==
+               {"sanity-webhook-signature",
+                "t=1672531200000,v1=dMWBgdDyejVsuXjFpQD-nMtulFv1pE2BBz5cNNzINcA"}
+
+      invalid_dt = 123
+
+      assert {:error, _, _} = SanityWebhookPlug.make_header(invalid_dt, body, secret)
+    end
+  end
+
   defp setup_conn(payload, signature) do
     :post
     |> conn("/sanity?foo=bar", payload)

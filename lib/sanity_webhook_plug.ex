@@ -52,6 +52,7 @@ defmodule SanityWebhookPlug do
   def call(conn, opts)
 
   def call(%Plug.Conn{halted: true} = conn, _), do: conn
+
   def call(%Plug.Conn{path_info: path_info} = conn, [path_info | opts]) do
     call(conn, opts)
   end
@@ -107,6 +108,23 @@ defmodule SanityWebhookPlug do
   """
   @spec get_debug(Plug.Conn.t()) :: t()
   def get_debug(conn), do: conn.private[@plug_key]
+
+  @doc """
+  Generate a request header tuple compatible with Sanity webhook systems.
+
+      {"sanity-webhook-signature", "ts=123,v1=abc123signature"}
+  """
+  @spec make_header(DateTime.t() | pos_integer(), binary(), String.t()) ::
+          {String.t(), String.t()} | {:error, String.t(), nil}
+  def make_header(%DateTime{} = dt, payload, secret) do
+    make_header(DateTime.to_unix(dt, :millisecond), payload, secret)
+  end
+
+  def make_header(timestamp, payload, secret) when is_integer(timestamp) do
+    with {:ok, sig} <- Signature.compute(timestamp, payload, secret) do
+      {header(), "t=#{timestamp},v1=#{sig}"}
+    end
+  end
 
   @doc """
   The expected request header that contains the Sanity webhook signature and timestamp
