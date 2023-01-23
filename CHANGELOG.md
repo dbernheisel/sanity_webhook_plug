@@ -1,5 +1,7 @@
 # Changelog
 
+## unreleased
+
 ## 0.1.2 (2023-01-23)
 
 - Skip halted conns
