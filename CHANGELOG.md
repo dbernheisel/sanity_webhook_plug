@@ -3,6 +3,7 @@
 ## unreleased
 
 - Skip halted conns
+- Add `make_header/3` function
 
 ## 0.1.1 (2023-01-09)
 
