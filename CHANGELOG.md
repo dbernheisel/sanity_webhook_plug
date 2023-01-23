@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## 0.1.2 (2023-01-23)
 
 - Skip halted conns
 - Add `make_header/3` function
