@@ -61,7 +61,6 @@ defmodule MyAppWeb.SanityWebhookHandler do
     conn
     |> Conn.put_resp_header("content-type", "application/json")
     |> Conn.send_resp(200, Jason.encode!(%{success: "yay!"}))
-    |> Conn.halt()
   end
 
   @impl SanityWebhookPlug.Handler
@@ -71,7 +70,6 @@ defmodule MyAppWeb.SanityWebhookHandler do
     conn
     |> Conn.put_resp_header("content-type", "application/json")
     |> Conn.send_resp(500, Jason.encode!(%{error: "uh oh!"}))
-    |> Conn.halt()
   end
 end
 ```
