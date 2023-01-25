@@ -42,7 +42,7 @@ runtime:
 ```elixir
 # in config/runtime.exs
 config :sanity_webhook_plug,
-  secret: System.get_env("SANITY_WEBHOOK_SECRET")
+  webhook_secret: System.get_env("SANITY_WEBHOOK_SECRET")
 ```
 
 Define a handler to handle webhooks:
@@ -60,7 +60,7 @@ defmodule MyAppWeb.SanityWebhookHandler do
 
     conn
     |> Conn.put_resp_header("content-type", "application/json")
-    |> Conn.send_resp(200, Jason.encode!({success: "yay!"}))
+    |> Conn.send_resp(200, Jason.encode!(%{success: "yay!"}))
     |> Conn.halt()
   end
 
@@ -70,7 +70,7 @@ defmodule MyAppWeb.SanityWebhookHandler do
 
     conn
     |> Conn.put_resp_header("content-type", "application/json")
-    |> Conn.send_resp(500, Jason.encode!({error: "uh oh!"}))
+    |> Conn.send_resp(500, Jason.encode!(%{error: "uh oh!"}))
     |> Conn.halt()
   end
 end
