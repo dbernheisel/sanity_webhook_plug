@@ -112,12 +112,14 @@ defmodule SanityWebhookPlug do
   @doc """
   Generate a request header tuple compatible with Sanity webhook systems.
 
+  Timestamp can be either a %DateTime{} or a unix timestamp in milliseconds.
+
       {"sanity-webhook-signature", "ts=123,v1=abc123signature"}
   """
   @spec make_header(DateTime.t() | pos_integer(), binary(), String.t()) ::
           {String.t(), String.t()} | {:error, String.t(), nil}
-  def make_header(%DateTime{} = dt, payload, secret) do
-    make_header(DateTime.to_unix(dt, :millisecond), payload, secret)
+  def make_header(%DateTime{} = timestamp, payload, secret) do
+    make_header(DateTime.to_unix(timestamp, :millisecond), payload, secret)
   end
 
   def make_header(timestamp, payload, secret) when is_integer(timestamp) do
