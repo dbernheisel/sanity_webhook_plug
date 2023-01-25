@@ -122,8 +122,8 @@ defmodule MyAppWeb.Endpoint do
   # ...
 
   plug SanityWebhookPlug,
-  at: "/webhooks/sanity",
-  handler: MyAppWeb.SanityWebhookHandler
+    at: "/webhooks/sanity",
+    handler: MyAppWeb.SanityWebhookHandler
 
   # Plug.Parsers down here somewhere
 end
