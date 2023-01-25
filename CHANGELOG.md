@@ -1,6 +1,8 @@
 # Changelog
 
-## unreleased
+## 0.1.3 (2023-01-25)
+
+- Correct documentation
 
 ## 0.1.2 (2023-01-23)
 
