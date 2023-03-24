@@ -14,7 +14,7 @@ defmodule SanityWebhookPlug.MixProject do
       deps: deps(),
       docs: docs(),
       homepage_url: "https://hexdocs.pm/sanity_webhook_plug",
-      source_url: "https://github.com/bitfo/sanity_webhook_plug",
+      source_url: "https://github.com/dbernheisel/sanity_webhook_plug",
       description: "Plug for handling Sanity.io GROQ-powered webhooks"
     ]
   end
@@ -45,10 +45,10 @@ defmodule SanityWebhookPlug.MixProject do
         "LICENSE*"
       ],
       links: %{
-        "GitHub" => "https://github.com/bitfo/sanity_webhook_plug",
-        "Readme" => "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/README.md",
+        "GitHub" => "https://github.com/dbernheisel/sanity_webhook_plug",
+        "Readme" => "https://github.com/dbernheisel/sanity_webhook_plug/blob/#{@version}/README.md",
         "Changelog" =>
-          "https://github.com/bitfo/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md",
+          "https://github.com/dbernheisel/sanity_webhook_plug/blob/#{@version}/CHANGELOG.md",
         "Sanity Webhook Docs" => "https://www.sanity.io/docs/webhooks"
       }
     }
